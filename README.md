@@ -13,5 +13,5 @@ It provides:
 - Juan Sebastian Villalba Roa — 20201020066
 - Santiago Arcila Martínez — 20191020075
 
-Universidad Distrital Francisco Jose de Caldas
-Software Engineering Seminary
+#### Universidad Distrital Francisco Jose de Caldas
+#### Software Engineering Seminary
