@@ -9,12 +9,9 @@ It provides:
 
 > Quick demo path: Sign up → Browse event → Choose quantity → Pay → Open “My Tickets” → Download QR/PDF.
 
-\begin{itemize}
-  \setlength\itemsep{0.2em}
-  \item Juan Daniel Vanegas Mayorquín — \textit{Cod:} 20222020077
-  \item Juan Sebastian Villalba Roa — \textit{Cod:} 20201020066
-  \item Daniel Santiago Arcila Martínez — \textit{Cod:} 20191020075
-\end{itemize}
+- Juan Daniel Vanegas Mayorquín — 20222020077
+- Juan Sebastian Villalba Roa — 20201020066
+- Santiago Arcila Martínez — 20191020075
 
 Universidad Distrital Francisco Jose de Caldas
 Software Engineering Seminary
