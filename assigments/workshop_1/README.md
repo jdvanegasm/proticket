@@ -1,4 +1,3 @@
-```markdown
 # Workshop-1
 ## Overview
 This workshop consolidates the initial planning artifacts for the project. All deliverables are compiled into a **single PDF** and referenced below.
@@ -26,4 +25,3 @@ proticket/assignments/workshop_1/README.md - workshop_1.pdf
 - [X] All sections included and consistent with each other.
 - [X] File is compiled as a **single PDF** named `Workshop-1.pdf`.
 - [X] `README.md` updated with page numbers/anchors.
-```
