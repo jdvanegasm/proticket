@@ -12,7 +12,7 @@ This workshop consolidates the **design artifacts** and **web UI progress** for 
   5. **Web UI Progress** (mockups/screenshots)
 
 ## Repository Structure
-```proticket/assignments/workshop_2/README.md — Workshop-2-assets.pdf```
+```proticket/assignments/workshop_2/README.md - Workshop-2 - assets.pdf```
 
 ## Section References
 - **UML Class Diagrams:** see *workshop_2.pdf*, Section 1.
