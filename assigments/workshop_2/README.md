@@ -10,7 +10,6 @@ This workshop consolidates the **design artifacts** and **web UI progress** for 
   3. **Deployment Diagram**
   4. **Business Process Diagram** (Activity/BPMN)
   5. **Web UI Progress** (mockups/screenshots)
-  6. **References**
 
 ## Repository Structure
 ```proticket/assignments/workshop_2/README.md — Workshop-2-assets.pdf```
@@ -21,7 +20,6 @@ This workshop consolidates the **design artifacts** and **web UI progress** for 
 - **Deployment Diagram:** see *workshop_2.pdf*, Section 3.
 - **Business Process (Activity/BPMN):** see *workshop_2.pdf*, Section 4.
 - **Web UI Progress:** see *workshop_2.pdf*, Section 5.
-- **References:** see *workshop_2.pdf*, Section 6.
 
 ## Completion Checklist
 - [X] All sections included and consistent with each other.
