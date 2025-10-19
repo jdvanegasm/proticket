@@ -1,7 +1,7 @@
 # Workshop-2
 
 ## Overview
-This workshop consolidates the **design artifacts** and **web UI progress** for the project. All deliverables are compiled into a **single PDF** and referenced below. :contentReference[oaicite:0]{index=0}
+This workshop consolidates the **design artifacts** and **web UI progress** for the project. All deliverables are compiled into a **single PDF** and referenced below.
 
 ## Deliverables
 - **Workshop-2.pdf** (single file containing):
@@ -13,15 +13,15 @@ This workshop consolidates the **design artifacts** and **web UI progress** for 
   6. **References**
 
 ## Repository Structure
-proticket/assignments/workshop_2/README.md — Workshop-2.pdf
+```proticket/assignments/workshop_2/README.md — Workshop-2-assets.pdf```
 
 ## Section References
-- **UML Class Diagrams:** see *Workshop-2.pdf*, Section 1.
-- **Architecture Diagram:** see *Workshop-2.pdf*, Section 2.
-- **Deployment Diagram:** see *Workshop-2.pdf*, Section 3.
-- **Business Process (Activity/BPMN):** see *Workshop-2.pdf*, Section 4.
-- **Web UI Progress:** see *Workshop-2.pdf*, Section 5.
-- **References:** see *Workshop-2.pdf*, Section 6.
+- **UML Class Diagrams:** see *workshop_2.pdf*, Section 1.
+- **Architecture Diagram:** see *workshop_2.pdf*, Section 2.
+- **Deployment Diagram:** see *workshop_2.pdf*, Section 3.
+- **Business Process (Activity/BPMN):** see *workshop_2.pdf*, Section 4.
+- **Web UI Progress:** see *workshop_2.pdf*, Section 5.
+- **References:** see *workshop_2.pdf*, Section 6.
 
 ## Completion Checklist
 - [X] All sections included and consistent with each other.
