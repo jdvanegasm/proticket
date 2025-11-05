@@ -209,9 +209,7 @@ CREATE INDEX idx_events_search ON events USING GIN (to_tsvector('english', title
 ## 7. Diagrams
 
 ### Auth Database
-
-![[img/auth_db.png]]
+![Auth Database](img/auth_db.png)
 
 ### Business Logic Database
-
-![[img/business_logic_db.png]]
+![Business Logic Database](img/business_logic_db.png)
