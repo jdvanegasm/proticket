@@ -1,0 +1,88 @@
+services:
+  # =============================================
+  # MYSQL (Auth Database)
+  # =============================================
+  mysql_auth:
+    image: mysql:8.0
+    container_name: mysql_auth
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - "${MYSQL_PORT}:3306"
+    volumes:
+      - mysql_auth_data:/var/lib/mysql
+      - ./schemas/mysql_init:/docker-entrypoint-initdb.d
+    networks:
+      - proticket_net
+
+  # =============================================
+  # PHPMYADMIN (Admin tool for MySQL)
+  # =============================================
+  phpmyadmin:
+    image: phpmyadmin:5
+    container_name: phpmyadmin_auth
+    restart: always
+    environment:
+      PMA_HOST: mysql_auth
+      PMA_USER: ${MYSQL_USER}
+      PMA_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - "${PHPMYADMIN_PORT}:80"
+    depends_on:
+      - mysql_auth
+    networks:
+      - proticket_net
+
+  # =============================================
+  # POSTGRES (Business Database)
+  # =============================================
+  postgres_business:
+    image: postgres:16
+    container_name: postgres_business
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      - postgres_business_data:/var/lib/postgresql/data
+      - ./schemas/postgres_init:/docker-entrypoint-initdb.d
+    networks:
+      - proticket_net
+
+  # =============================================
+  # PGADMIN (Admin tool for PostgreSQL)
+  # =============================================
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin_business
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+    ports:
+      - "${PGADMIN_PORT}:80"
+    depends_on:
+      - postgres_business
+    networks:
+      - proticket_net
+
+# =============================================
+# PERSISTENT DATA VOLUMES
+# =============================================
+volumes:
+  mysql_auth_data:
+  postgres_business_data:
+
+# =============================================
+# SHARED NETWORK
+# =============================================
+networks:
+  proticket_net:
+    driver: bridge
