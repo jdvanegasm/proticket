@@ -3,6 +3,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
+from uuid import uuid4
 from core.database import Base
 
 
@@ -55,7 +56,14 @@ class Order(Base):
 class Payment(Base):
     __tablename__ = "payments"
 
-    id_payment = Column(UUID(as_uuid=True), primary_key=True, server_default=func.uuid_generate_v4(), index=True)
+    id_payment = Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+        unique=True,
+        index=True
+    )
+
     order_id = Column(Integer, ForeignKey("orders.id_order", ondelete="CASCADE"), nullable=False)
     provider_txn_id = Column(String(100), unique=True, nullable=False)
     status = Column(String(20), default="initiated")
@@ -69,7 +77,7 @@ class Payment(Base):
 class Ticket(Base):
     __tablename__ = "tickets"
 
-    id_ticket = Column(UUID(as_uuid=True), primary_key=True, server_default=func.uuid_generate_v4(), index=True)
+    id_ticket = Column(UUID(as_uuid=True), primary_key=True, index=True)
     order_id = Column(Integer, ForeignKey("orders.id_order", ondelete="CASCADE"), nullable=False)
     ticket_code = Column(UUID(as_uuid=True), unique=True, server_default=func.uuid_generate_v4())
     pdf_url = Column(String(255))

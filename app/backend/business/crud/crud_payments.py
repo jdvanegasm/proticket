@@ -4,7 +4,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from models.models import Payment, Order
 from schemas.payment import PaymentCreate
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timezone
 
 def create_payment(db: Session, payment_data: PaymentCreate):
     order = db.query(Order).filter(Order.id_order == payment_data.order_id).first()
@@ -46,7 +46,7 @@ def update_payment_status(db: Session, payment_id: UUID, new_status: str):
 
     try:
         payment.status = new_status
-        payment.updated_at = datetime.utcnow()
+        payment.updated_at = datetime.now(timezone.utc)
         db.commit()
         db.refresh(payment)
         return payment, None

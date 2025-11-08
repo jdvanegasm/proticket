@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 from uuid import UUID
 
@@ -16,6 +16,6 @@ class EventCreate(EventBase):
 class EventOut(EventBase):
     id_event: int       
     organizer_id: int   
+    
 
-    class Config:
-        from_attributes = True   
+    model_config = ConfigDict(from_attributes=True)

@@ -1,11 +1,12 @@
-from pydantic_settings import BaseSettings
+from pathlib import Path
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 
-class Settings(BaseSettings):
-    BUSINESS_DATABASE_URL: str = Field(..., env="BUSINESS_DATABASE_URL")
-    # AUTH_SERVICE_URL: str = Field(..., env="AUTH_SERVICE_URL")
+BASE_DIR = Path(__file__).resolve().parent.parent
 
-    class Config:
-        env_file = ".env"
+class Settings(BaseSettings):
+    BUSINESS_DATABASE_URL: str
+
+    model_config = SettingsConfigDict(env_file=str(BASE_DIR / ".env"))
 
 settings = Settings()

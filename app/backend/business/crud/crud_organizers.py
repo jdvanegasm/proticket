@@ -11,7 +11,7 @@ def create_organizer(db: Session, organizer_data: OrganizerCreate, user_id: UUID
     if existing:
         raise HTTPException(
             status_code=400,
-            detail="El usuario ya tiene un organizador registrado."
+            detail="This user is already registered as an organizer"
         )
 
     new_organizer = Organizer(
@@ -30,7 +30,7 @@ def get_organizer_by_id(db: Session, organizer_id: int):
     if not organizer:
         raise HTTPException(
             status_code=404,
-            detail="Organizer not found."
+            detail="Organizer not found"
         )
     return organizer
 
@@ -44,10 +44,10 @@ def update_organizer(db: Session, organizer_id: int, organizer_data: OrganizerUp
     if not organizer:
         raise HTTPException(
             status_code=404,
-            detail="Organizer not found."
+            detail="Organizer not found"
         )
 
-    for key, value in organizer_data.dict(exclude_unset=True).items():
+    for key, value in organizer_data.model_dump(exclude_unset=True).items():
         setattr(organizer, key, value)
 
     db.commit()
@@ -60,9 +60,9 @@ def delete_organizer(db: Session, organizer_id: int):
     if not organizer:
         raise HTTPException(
             status_code=404,
-            detail="Organizer not found."
+            detail="Organizer not found"
         )
 
     db.delete(organizer)
     db.commit()
-    return {"message": "Organizer deleted succesfully."}
+    return {"message": "Organizer deleted succesfully"}

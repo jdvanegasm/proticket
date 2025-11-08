@@ -14,6 +14,7 @@ def create_ticket(db: Session, ticket_data: TicketCreate):
         # Create ticket with code and QR
         new_ticket = Ticket(
             order_id=ticket_data.order_id,
+            id_ticket=uuid4(),
             ticket_code=uuid4(),  # Generate a new UUID code
             pdf_url=ticket_data.pdf_url,
             qr_code=ticket_data.qr_code
