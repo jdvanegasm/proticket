@@ -1,1 +1,25 @@
-# Backend dockerized pipeline
+services:
+  # =============================================
+  # AUTH SERVICE (Spring Boot + Java 17)
+  # =============================================
+  auth_service:
+    build:
+      context: ../backend/auth
+      dockerfile: Dockerfile
+    container_name: auth_service
+    restart: always
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_HOST: ${MYSQL_CONTAINER}
+      JWT_SECRET: ${JWT_SECRET}
+    ports:
+      - "8080:8080"
+    networks:
+      - ops_proticket_net
+
+networks:
+  ops_proticket_net:
+    external: true
