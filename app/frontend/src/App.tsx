@@ -18,6 +18,8 @@ import { toast } from "sonner@2.0.3";
 import { projectId, publicAnonKey } from "./utils/supabase/info";
 import { Loader2 } from "lucide-react";
 import { useLanguage } from "./contexts/LanguageContext";
+import { eventsService } from "./services/events.service";
+import { TestConnection } from "./components/TestConnection";
 
 function AppContent() {
   const { user, accessToken, loading: authLoading } = useAuth();
@@ -32,6 +34,7 @@ function AppContent() {
   const [showSignup, setShowSignup] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   const selectedEvent = events.find(e => e.id === selectedEventId) || myEvents.find(e => e.id === selectedEventId);
   const editingEvent = myEvents.find(e => e.id === editingEventId);
@@ -47,45 +50,22 @@ function AppContent() {
   }, [user, accessToken]);
 
   async function fetchEvents() {
-    try {
-      const url = `https://${projectId}.supabase.co/functions/v1/make-server-45ce65c6/events`;
-      console.log("=== Fetching Events ===");
-      console.log("URL:", url);
-      console.log("Project ID:", projectId);
-      console.log("Authorization header:", `Bearer ${publicAnonKey.substring(0, 20)}...`);
-      
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          "Authorization": `Bearer ${publicAnonKey}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      console.log("Response status:", response.status, response.statusText);
-      console.log("Response headers:", Object.fromEntries(response.headers.entries()));
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log("Events received:", data.events?.length || 0);
-        console.log("Sample event:", data.events?.[0] ? JSON.stringify(data.events[0]).substring(0, 100) : "No events");
-        setEvents(data.events || []);
-      } else {
-        const errorText = await response.text();
-        console.error("Response error:", response.status, errorText);
-        toast.error("Error al cargar eventos");
-      }
-    } catch (error: any) {
-      console.error("=== Fetch Error ===");
-      console.error("Error type:", error?.constructor?.name);
-      console.error("Error message:", error?.message);
-      console.error("Error stack:", error?.stack);
-      console.error("Full error:", error);
-      toast.error("Error al cargar eventos. Verifica la conexión.");
-    } finally {
-      setLoading(false);
-    }
+  try {
+    console.log("Fetching events from Python backend...");
+    
+    const eventsData = await eventsService.getAll();
+    console.log(`Events received: ${eventsData.length}`);
+    
+    setEvents(eventsData);
+    setApiError(null);
+  } catch (error: any) {
+    console.error("Error fetching events:", error);
+    setApiError(error.message);
+    toast.error("Error al cargar eventos desde el backend");
+  } finally {
+    setLoading(false);
   }
+}
 
   async function fetchMyEvents() {
     if (!accessToken) return;
@@ -314,6 +294,8 @@ function AppContent() {
       />
       
       {currentView === "diagnostic" && <ServerDiagnostic />}
+
+      {currentView === "test" && <TestConnection />}
 
       {currentView === "home" && (
         <EventList 
