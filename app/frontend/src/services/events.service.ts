@@ -72,28 +72,53 @@ export const eventsService = {
   },
 
   // Crear evento (organizers)
-  create: async (eventData: any, accessToken: string): Promise<EventUI> => {
-    const event = await apiRequest<EventAPI>('/events/', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify(eventData),
-    });
-    return transformEventFromAPI(event);
-  },
+create: async (eventData: any, accessToken: string): Promise<EventUI> => {
+  // Convertir datos del formulario a formato API
+  const apiData = {
+    title: eventData.title,
+    description: eventData.description,
+    location: eventData.location,
+    start_datetime: `${eventData.date}T${eventData.time}:00`,
+    price: parseFloat(eventData.price),
+    capacity: parseInt(eventData.totalTickets),
+    organizer_id: 1, // Por ahora usamos ID fijo
+    status: "active",
+  };
+
+  const event = await apiRequest<EventAPI>('/events/', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(apiData),
+  });
+  return transformEventFromAPI(event);
+},
 
   // Actualizar evento
-  update: async (id: number, eventData: any, accessToken: string): Promise<EventUI> => {
-    const event = await apiRequest<EventAPI>(`/events/${id}`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify(eventData),
-    });
-    return transformEventFromAPI(event);
-  },
+  // Actualizar evento
+update: async (id: number, eventData: any, accessToken: string): Promise<EventUI> => {
+  // Convertir datos del formulario a formato API
+  const apiData = {
+    title: eventData.title,
+    description: eventData.description,
+    location: eventData.location,
+    start_datetime: `${eventData.date}T${eventData.time}:00`,
+    price: parseFloat(eventData.price),
+    capacity: parseInt(eventData.totalTickets),
+    organizer_id: 1,
+    status: eventData.status || "active",
+  };
+
+  const event = await apiRequest<EventAPI>(`/events/${id}`, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(apiData),
+  });
+  return transformEventFromAPI(event);
+},
 
   // Eliminar evento
   delete: async (id: number, accessToken: string): Promise<void> => {

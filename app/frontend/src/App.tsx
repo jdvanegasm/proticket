@@ -19,6 +19,8 @@ import { projectId, publicAnonKey } from "./utils/supabase/info";
 import { Loader2 } from "lucide-react";
 import { useLanguage } from "./contexts/LanguageContext";
 import { eventsService } from "./services/events.service";
+import { ordersService } from "./services/orders.service";
+import { ticketsService } from "./services/tickets.service";
 import { TestConnection } from "./components/TestConnection";
 
 function AppContent() {
@@ -50,40 +52,43 @@ function AppContent() {
   }, [user, accessToken]);
 
   async function fetchEvents() {
-  try {
-    console.log("Fetching events from Python backend...");
-    
-    const eventsData = await eventsService.getAll();
-    console.log(`Events received: ${eventsData.length}`);
-    
-    setEvents(eventsData);
-    setApiError(null);
-  } catch (error: any) {
-    console.error("Error fetching events:", error);
-    setApiError(error.message);
-    toast.error("Error al cargar eventos desde el backend");
-  } finally {
-    setLoading(false);
+    try {
+      console.log("Fetching events from Python backend...");
+
+      const eventsData = await eventsService.getAll();
+      console.log(`Events received: ${eventsData.length}`);
+
+      setEvents(eventsData);
+      setApiError(null);
+    } catch (error: any) {
+      console.error("Error fetching events:", error);
+      setApiError(error.message);
+      toast.error("Error al cargar eventos desde el backend");
+    } finally {
+      setLoading(false);
+    }
   }
-}
 
   async function fetchMyEvents() {
     if (!accessToken) return;
 
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-45ce65c6/events/my-events`,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        }
-      );
+      // Por ahora, obtenemos todos los eventos
+      // TODO: filtrar por organizador cuando tengamos autenticación completa
+      const allEvents = await eventsService.getAll();
 
-      if (response.ok) {
-        const data = await response.json();
-        setMyEvents(data.events || []);
-      }
+      // Transformar a formato del dashboard
+      const dashboardEvents = allEvents.map(event => ({
+        id: event.id,
+        title: event.title,
+        date: event.date,
+        status: event.status || "active",
+        ticketsSold: 0, // TODO: calcular desde las órdenes
+        totalTickets: event.totalTickets,
+        revenue: 0, // TODO: calcular desde las órdenes
+      }));
+
+      setMyEvents(dashboardEvents);
     } catch (error) {
       console.error("Error fetching my events:", error);
     }
@@ -110,44 +115,57 @@ function AppContent() {
   };
 
   const handlePurchaseComplete = async (data: any) => {
-    if (!accessToken || !selectedEvent) return;
+    if (!accessToken || !selectedEvent || !user) {
+      toast.error("Usuario no autenticado");
+      return;
+    }
 
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-45ce65c6/purchases`,
+      console.log("Creating order with buyer_id:", user.id);
+
+      // Crear la orden con el buyer_id del usuario autenticado
+      const order = await ordersService.create(
         {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({
-            eventId: selectedEvent.id,
-            eventTitle: selectedEvent.title,
-            eventDate: selectedEvent.date,
-            eventTime: selectedEvent.time,
-            eventLocation: selectedEvent.location,
-            quantity: data.quantity,
-            buyerName: data.buyerName,
-            buyerEmail: data.buyerEmail,
-          }),
-        }
+          event_id: parseInt(selectedEvent.id),
+          quantity: data.quantity,
+          buyer_id: user.id, // AGREGADO - enviar el ID del usuario
+        },
+        accessToken
       );
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Error al procesar la compra");
+      console.log("Order created:", order);
+
+      // Crear tickets para la orden
+      const tickets = [];
+      for (let i = 0; i < data.quantity; i++) {
+        const ticket = await ticketsService.create(
+          {
+            order_id: order.id_order,
+            qr_code: `QR-${order.id_order}-${i + 1}`,
+          },
+          accessToken
+        );
+        tickets.push(ticket);
       }
 
-      const result = await response.json();
+      console.log("Tickets created:", tickets);
+
+      // Generar código de confirmación
+      const confirmationCode = tickets[0]?.ticket_code || `PT-${order.id_order}`;
+
       setPurchaseData({
         ...data,
-        confirmationCode: result.purchase.confirmationCode,
+        orderId: order.id_order,
+        confirmationCode: confirmationCode,
+        totalPrice: order.total_price,
+        status: order.status,
+        tickets: tickets,
       });
+
       setCurrentView("confirmation");
       toast.success(t("message.purchaseSuccess"));
-      
-      // Refresh events to update ticket count
+
+      // Refrescar eventos
       await fetchEvents();
     } catch (error: any) {
       console.error("Purchase error:", error);
@@ -162,22 +180,11 @@ function AppContent() {
     }
 
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-45ce65c6/events`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify(eventData),
-        }
-      );
+      console.log("Creating event:", eventData);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Error al crear evento");
-      }
+      const newEvent = await eventsService.create(eventData, accessToken);
+
+      console.log("Event created:", newEvent);
 
       await fetchEvents();
       await fetchMyEvents();
@@ -197,22 +204,9 @@ function AppContent() {
     }
 
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-45ce65c6/events/${editingEventId}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify(eventData),
-        }
-      );
+      console.log("Updating event:", editingEventId, eventData);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Error al actualizar evento");
-      }
+      await eventsService.update(parseInt(editingEventId), eventData, accessToken);
 
       await fetchEvents();
       await fetchMyEvents();
@@ -232,20 +226,9 @@ function AppContent() {
     }
 
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-45ce65c6/events/${eventId}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        }
-      );
+      console.log("Deleting event:", eventId);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Error al eliminar evento");
-      }
+      await eventsService.delete(parseInt(eventId), accessToken);
 
       await fetchEvents();
       await fetchMyEvents();
@@ -286,26 +269,26 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header 
+      <Header
         currentView={currentView}
         onNavigate={handleNavigate}
         onOpenLogin={() => setShowLogin(true)}
         onOpenSignup={() => setShowSignup(true)}
       />
-      
+
       {currentView === "diagnostic" && <ServerDiagnostic />}
 
       {currentView === "test" && <TestConnection />}
 
       {currentView === "home" && (
-        <EventList 
-          events={events} 
+        <EventList
+          events={events}
           onSelectEvent={handleSelectEvent}
         />
       )}
 
       {currentView === "details" && selectedEvent && (
-        <EventDetails 
+        <EventDetails
           event={selectedEvent}
           onBack={() => setCurrentView("home")}
           onBuyTickets={handleBuyTickets}
@@ -313,7 +296,7 @@ function AppContent() {
       )}
 
       {currentView === "purchase" && selectedEvent && (
-        <PurchaseFlow 
+        <PurchaseFlow
           event={selectedEvent}
           onBack={() => setCurrentView("details")}
           onComplete={handlePurchaseComplete}
@@ -321,7 +304,7 @@ function AppContent() {
       )}
 
       {currentView === "confirmation" && purchaseData && selectedEvent && (
-        <TicketConfirmation 
+        <TicketConfirmation
           purchase={purchaseData}
           event={selectedEvent}
           onBackToEvents={() => {
@@ -337,7 +320,7 @@ function AppContent() {
       )}
 
       {currentView === "dashboard" && (
-        <OrganizerDashboard 
+        <OrganizerDashboard
           events={myEvents}
           onCreateEvent={() => {
             setEditingEventId(null);
@@ -349,7 +332,7 @@ function AppContent() {
       )}
 
       {currentView === "create" && (
-        <CreateEventForm 
+        <CreateEventForm
           onBack={() => {
             setCurrentView("dashboard");
             setEditingEventId(null);
@@ -359,7 +342,7 @@ function AppContent() {
       )}
 
       {currentView === "edit" && editingEvent && (
-        <CreateEventForm 
+        <CreateEventForm
           onBack={() => {
             setCurrentView("dashboard");
             setEditingEventId(null);
@@ -369,7 +352,7 @@ function AppContent() {
         />
       )}
 
-      <LoginModal 
+      <LoginModal
         open={showLogin}
         onClose={() => setShowLogin(false)}
         onSwitchToSignup={() => {
@@ -382,7 +365,7 @@ function AppContent() {
         }}
       />
 
-      <SignupModal 
+      <SignupModal
         open={showSignup}
         onClose={() => setShowSignup(false)}
         onSwitchToLogin={() => {
@@ -391,7 +374,7 @@ function AppContent() {
         }}
       />
 
-      <ForgotPasswordModal 
+      <ForgotPasswordModal
         open={showForgotPassword}
         onClose={() => setShowForgotPassword(false)}
         onBackToLogin={() => {
