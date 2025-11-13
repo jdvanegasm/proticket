@@ -17,6 +17,10 @@ export interface AuthResponse {
   role: string;
 }
 
+export interface AuthErrorResponse {
+  error: string;
+}
+
 async function authRequest<T = any>(
   endpoint: string,
   options: RequestInit = {}
@@ -40,9 +44,17 @@ async function authRequest<T = any>(
   console.log(`[AUTH] Response status: ${response.status}`);
 
   if (!response.ok) {
-    const errorText = await response.text();
-    console.error(`[AUTH] Error response:`, errorText);
-    throw new Error(`Auth Error: ${response.status} - ${errorText}`);
+    // Intentar parsear el error como JSON
+    try {
+      const errorData: AuthErrorResponse = await response.json();
+      console.error(`[AUTH] Error response:`, errorData);
+      throw new Error(errorData.error || `Error ${response.status}`);
+    } catch (parseError) {
+      // Si no se puede parsear, usar mensaje genérico
+      const errorText = await response.text();
+      console.error(`[AUTH] Error response (text):`, errorText);
+      throw new Error(errorText || `Error ${response.status}`);
+    }
   }
 
   const data = await response.json();

@@ -9,6 +9,7 @@ export interface EventAPI {
   price: number;
   capacity: number;
   organizer_id: number;
+  creator_user_id?: string;
   status: string;
   created_at?: string;
 }
@@ -27,7 +28,9 @@ export interface EventUI {
   totalTickets: number;
   organizerName?: string;
   organizerId?: string;
+  creatorUserId?: string;
   status?: string;
+  start_datetime?: string; // Para poder parsear fecha/hora correctamente
 }
 
 // Convertir de formato API a formato UI
@@ -49,12 +52,14 @@ function transformEventFromAPI(apiEvent: EventAPI): EventUI {
       minute: '2-digit' 
     }),
     price: apiEvent.price,
-    category: "Música", // Default por ahora
+    category: "Música",
     image: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800",
     availableTickets: apiEvent.capacity || 0,
     totalTickets: apiEvent.capacity || 0,
     organizerName: "Organizador",
+    creatorUserId: apiEvent.creator_user_id,
     status: apiEvent.status,
+    start_datetime: apiEvent.start_datetime, // Mantener el datetime original para edición
   };
 }
 
@@ -72,53 +77,50 @@ export const eventsService = {
   },
 
   // Crear evento (organizers)
-create: async (eventData: any, accessToken: string): Promise<EventUI> => {
-  // Convertir datos del formulario a formato API
-  const apiData = {
-    title: eventData.title,
-    description: eventData.description,
-    location: eventData.location,
-    start_datetime: `${eventData.date}T${eventData.time}:00`,
-    price: parseFloat(eventData.price),
-    capacity: parseInt(eventData.totalTickets),
-    organizer_id: 1, // Por ahora usamos ID fijo
-    status: "active",
-  };
+  create: async (eventData: any, accessToken: string): Promise<EventUI> => {
+    const apiData = {
+      title: eventData.title,
+      description: eventData.description,
+      location: eventData.location,
+      start_datetime: `${eventData.date}T${eventData.time}:00`,
+      price: parseFloat(eventData.price),
+      capacity: parseInt(eventData.totalTickets),
+      organizer_id: 1,
+      status: "active",
+    };
 
-  const event = await apiRequest<EventAPI>('/events/', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify(apiData),
-  });
-  return transformEventFromAPI(event);
-},
+    const event = await apiRequest<EventAPI>('/events/', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(apiData),
+    });
+    return transformEventFromAPI(event);
+  },
 
   // Actualizar evento
-  // Actualizar evento
-update: async (id: number, eventData: any, accessToken: string): Promise<EventUI> => {
-  // Convertir datos del formulario a formato API
-  const apiData = {
-    title: eventData.title,
-    description: eventData.description,
-    location: eventData.location,
-    start_datetime: `${eventData.date}T${eventData.time}:00`,
-    price: parseFloat(eventData.price),
-    capacity: parseInt(eventData.totalTickets),
-    organizer_id: 1,
-    status: eventData.status || "active",
-  };
+  update: async (id: number, eventData: any, accessToken: string): Promise<EventUI> => {
+    const apiData = {
+      title: eventData.title,
+      description: eventData.description,
+      location: eventData.location,
+      start_datetime: `${eventData.date}T${eventData.time}:00`,
+      price: parseFloat(eventData.price),
+      capacity: parseInt(eventData.totalTickets),
+      organizer_id: 1,
+      status: eventData.status || "active",
+    };
 
-  const event = await apiRequest<EventAPI>(`/events/${id}`, {
-    method: 'PUT',
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify(apiData),
-  });
-  return transformEventFromAPI(event);
-},
+    const event = await apiRequest<EventAPI>(`/events/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(apiData),
+    });
+    return transformEventFromAPI(event);
+  },
 
   // Eliminar evento
   delete: async (id: number, accessToken: string): Promise<void> => {
@@ -128,5 +130,22 @@ update: async (id: number, eventData: any, accessToken: string): Promise<EventUI
         'Authorization': `Bearer ${accessToken}`,
       },
     });
+  },
+
+  // Obtener eventos por creador (organizador)
+  getByCreator: async (creatorUserId: string, accessToken: string): Promise<EventUI[]> => {
+    console.log(`🔍 Obteniendo eventos para creator: ${creatorUserId}`);
+    try {
+      const events = await apiRequest<EventAPI[]>(`/events/creator/${creatorUserId}`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
+      console.log(`✅ Eventos recibidos del API:`, events);
+      return events.map(transformEventFromAPI);
+    } catch (error: any) {
+      console.error(`❌ Error en getByCreator:`, error);
+      throw error;
+    }
   },
 };
