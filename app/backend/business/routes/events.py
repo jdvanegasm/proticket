@@ -50,16 +50,52 @@ def get_user_id_from_token(authorization: Optional[str] = Header(None)) -> Optio
         print(f"❌ Error decodificando token: {e}")
         return None
 
+def get_user_role_from_token(authorization: Optional[str] = Header(None)) -> Optional[str]:
+    """Extrae el rol del usuario del token JWT"""
+    if not authorization or not authorization.startswith("Bearer "):
+        return None
+    
+    try:
+        token = authorization.replace("Bearer ", "")
+        
+        # Intentar decodificar como token de Supabase
+        try:
+            payload = jwt.decode(token, options={"verify_signature": False})
+            # En Supabase el rol puede estar en user_metadata
+            user_metadata = payload.get("user_metadata", {})
+            role = user_metadata.get("role")
+            if role:
+                print(f"✅ Rol extraído de Supabase token: {role}")
+                return role
+        except Exception:
+            pass
+        
+        # Intentar con JWT personalizado
+        try:
+            payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+            role = payload.get("role")
+            if role:
+                print(f"✅ Rol extraído de JWT personalizado: {role}")
+                return role
+        except jwt.InvalidTokenError:
+            pass
+        
+        return None
+        
+    except Exception as e:
+        print(f"❌ Error extrayendo rol del token: {e}")
+        return None
+
 @router.post("/", response_model=EventOut)
 def create_event(
     event: EventCreate, 
     db: Session = Depends(get_db),
     authorization: Optional[str] = Header(None)
 ):
-    """Crear un nuevo evento"""
+    """Crear un nuevo evento - Organizers y ADMIN pueden crear"""
     print("\n=== CREAR EVENTO ===")
     
-    # Extraer user_id del token
+    # Extraer user_id y role del token
     user_id = get_user_id_from_token(authorization)
     
     if not user_id:
@@ -71,9 +107,22 @@ def create_event(
     
     print(f"✅ Usuario autenticado: {user_id} (tipo: {type(user_id)})")
     
-    # Asignar el creator_user_id (convertir string a UUID si es necesario)
+    # NUEVO: Obtener el rol del usuario
+    user_role = get_user_role_from_token(authorization)
+    print(f"👔 Rol del usuario: {user_role}")
+    
+    # Validar que sea organizer o admin
+    if user_role not in ["organizer", "admin"]:
+        print(f"❌ Usuario con rol '{user_role}' no puede crear eventos")
+        raise HTTPException(
+            status_code=403,
+            detail="Solo los organizadores y administradores pueden crear eventos"
+        )
+    
+    print(f"✅ Usuario autorizado para crear eventos (rol: {user_role})")
+    
+    # Asignar el creator_user_id
     try:
-        # Si user_id es string, convertirlo a UUID
         if isinstance(user_id, str):
             event.creator_user_id = UUID(user_id)
         else:
@@ -93,77 +142,49 @@ def create_event(
     
     return created_event
 
-@router.get("/", response_model=list[EventOut])
+@router.get("/")
 def get_events(db: Session = Depends(get_db)):
-    """Obtener todos los eventos"""
+    """Obtener todos los eventos CON estadísticas"""
     events = crud_event.get_all_events(db)
     print(f"\n=== OBTENER EVENTOS === Total: {len(events)}")
-    for event in events:
-        print(f"  - Evento {event.id_event}: creator={event.creator_user_id}")
+    # Los eventos ya vienen como diccionarios con estadísticas
     return events
 
-@router.get("/creator/{creator_user_id}", response_model=list[EventOut])
+@router.get("/creator/{creator_user_id}")
 def get_events_by_creator(
     creator_user_id: UUID,
     db: Session = Depends(get_db),
     authorization: Optional[str] = Header(None)
 ):
-    """Obtener todos los eventos creados por un usuario específico"""
+    """Obtener todos los eventos creados por un usuario específico CON estadísticas"""
     try:
         print(f"\n=== OBTENER EVENTOS POR CREADOR {creator_user_id} ===")
-        print(f"Tipo de creator_user_id: {type(creator_user_id)}")
         
-        # Verificar autenticación
         user_id = get_user_id_from_token(authorization)
         if not user_id:
-            print("❌ No se pudo extraer user_id del token")
-            raise HTTPException(
-                status_code=401,
-                detail="Debes iniciar sesión para ver tus eventos"
-            )
+            raise HTTPException(status_code=401, detail="Debes iniciar sesión")
         
-        print(f"✅ User ID del token: {user_id} (tipo: {type(user_id)})")
-        print(f"✅ Creator User ID del path: {creator_user_id} (tipo: {type(creator_user_id)})")
+        if str(user_id) != str(creator_user_id):
+            raise HTTPException(status_code=403, detail="No autorizado")
         
-        # Verificar que el usuario solo pueda ver sus propios eventos
-        # Convertir ambos a string para comparar
-        user_id_str = str(user_id)
-        creator_id_str = str(creator_user_id)
-        
-        print(f"🔍 Comparando: '{user_id_str}' == '{creator_id_str}'")
-        
-        if user_id_str != creator_id_str:
-            print("❌ Los IDs no coinciden")
-            raise HTTPException(
-                status_code=403,
-                detail="No tienes permiso para ver los eventos de otro usuario"
-            )
-        
-        print("✅ Usuario autorizado, obteniendo eventos...")
         events = crud_event.get_events_by_creator(db, creator_user_id)
         print(f"✅ Eventos encontrados: {len(events)}")
         return events
         
     except HTTPException:
-        # Re-lanzar HTTPException para que FastAPI la maneje correctamente con CORS
         raise
     except Exception as e:
-        print(f"❌ Error inesperado en get_events_by_creator: {e}")
-        print(f"❌ Tipo de error: {type(e)}")
+        print(f"❌ Error: {e}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error interno del servidor: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/{event_id}", response_model=EventOut)
+@router.get("/{event_id}")
 def get_event(event_id: int, db: Session = Depends(get_db)):
-    """Obtener un evento por ID"""
+    """Obtener un evento por ID CON estadísticas"""
     event = crud_event.get_event_by_id(db, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Evento no encontrado")
-    print(f"\n=== GET EVENTO {event_id} === creator_user_id: {event.creator_user_id}")
     return event
 
 @router.put("/{event_id}", response_model=EventOut)
@@ -173,7 +194,7 @@ def update_event(
     db: Session = Depends(get_db),
     authorization: Optional[str] = Header(None)
 ):
-    """Actualizar un evento existente - Solo el creador puede editarlo"""
+    """Actualizar un evento existente - Creador o ADMIN pueden editarlo"""
     print(f"\n=== ACTUALIZAR EVENTO {event_id} ===")
     
     # Obtener el evento
@@ -182,9 +203,11 @@ def update_event(
         print(f"❌ Evento {event_id} no encontrado")
         raise HTTPException(status_code=404, detail="Evento no encontrado")
     
-    print(f"📌 Evento en BD - creator_user_id: {db_event.creator_user_id}")
+    # Es un dict, no un objeto SQLAlchemy
+    event_creator = str(db_event.get('creator_user_id')) if db_event.get('creator_user_id') else None
+    print(f"📌 Evento en BD - creator_user_id: {event_creator}")
     
-    # Extraer user_id del token
+    # Extraer user_id y role del token
     user_id = get_user_id_from_token(authorization)
     
     if not user_id:
@@ -196,24 +219,23 @@ def update_event(
     
     print(f"👤 Usuario actual: {user_id}")
     
-    # Validar que el usuario sea el creador del evento
-    # Convertir ambos a string para comparar
-    event_creator = str(db_event.creator_user_id) if db_event.creator_user_id else None
+    # NUEVO: Obtener el rol del usuario desde el token
+    user_role = get_user_role_from_token(authorization)
+    print(f"👔 Rol del usuario: {user_role}")
+    
+    # Validar permisos: admin puede editar cualquier evento, otros solo sus propios eventos
     current_user = str(user_id)
     
-    print(f"🔍 Comparando creadores:")
-    print(f"   - Creador del evento: {event_creator}")
-    print(f"   - Usuario actual: {current_user}")
-    print(f"   - ¿Son iguales?: {event_creator == current_user}")
-    
-    if event_creator and event_creator != current_user:
-        print("❌ El usuario NO es el creador del evento")
+    if user_role == "admin":
+        print("✅ Usuario ADMIN - Puede editar cualquier evento")
+    elif event_creator and event_creator != current_user:
+        print("❌ El usuario NO es el creador ni ADMIN")
         raise HTTPException(
             status_code=403, 
-            detail="No tienes permiso para editar este evento. Solo el creador puede modificarlo."
+            detail="No tienes permiso para editar este evento. Solo el creador o un administrador pueden modificarlo."
         )
-    
-    print("✅ Usuario autorizado para editar")
+    else:
+        print("✅ Usuario autorizado para editar (es el creador)")
     
     # Actualizar usando el CRUD
     updated_event = crud_event.update_event(db, event_id, event)
@@ -221,7 +243,7 @@ def update_event(
     if not updated_event:
         raise HTTPException(status_code=404, detail="Error al actualizar evento")
     
-    print(f"✅ Evento actualizado - creator_user_id preservado: {updated_event.creator_user_id}")
+    print(f"✅ Evento actualizado")
     
     return updated_event
 
@@ -231,7 +253,7 @@ def delete_event(
     db: Session = Depends(get_db),
     authorization: Optional[str] = Header(None)
 ):
-    """Eliminar un evento - Solo el creador puede eliminarlo"""
+    """Eliminar un evento - Creador o ADMIN pueden eliminarlo"""
     print(f"\n=== ELIMINAR EVENTO {event_id} ===")
     
     # Obtener el evento
@@ -240,9 +262,10 @@ def delete_event(
         print(f"❌ Evento {event_id} no encontrado")
         raise HTTPException(status_code=404, detail="Evento no encontrado")
     
-    print(f"📌 Evento en BD - creator_user_id: {db_event.creator_user_id}")
+    event_creator = str(db_event.get('creator_user_id')) if db_event.get('creator_user_id') else None
+    print(f"📌 Evento en BD - creator_user_id: {event_creator}")
     
-    # Extraer user_id del token
+    # Extraer user_id y role del token
     user_id = get_user_id_from_token(authorization)
     
     if not user_id:
@@ -254,23 +277,23 @@ def delete_event(
     
     print(f"👤 Usuario actual: {user_id}")
     
-    # Validar que el usuario sea el creador del evento
-    event_creator = str(db_event.creator_user_id) if db_event.creator_user_id else None
+    # NUEVO: Obtener el rol del usuario desde el token
+    user_role = get_user_role_from_token(authorization)
+    print(f"👔 Rol del usuario: {user_role}")
+    
+    # Validar permisos: admin puede eliminar cualquier evento, otros solo sus propios eventos
     current_user = str(user_id)
     
-    print(f"🔍 Comparando creadores:")
-    print(f"   - Creador del evento: {event_creator}")
-    print(f"   - Usuario actual: {current_user}")
-    print(f"   - ¿Son iguales?: {event_creator == current_user}")
-    
-    if event_creator and event_creator != current_user:
-        print("❌ El usuario NO es el creador del evento")
+    if user_role == "admin":
+        print("✅ Usuario ADMIN - Puede eliminar cualquier evento")
+    elif event_creator and event_creator != current_user:
+        print("❌ El usuario NO es el creador ni ADMIN")
         raise HTTPException(
             status_code=403, 
-            detail="No tienes permiso para eliminar este evento. Solo el creador puede eliminarlo."
+            detail="No tienes permiso para eliminar este evento. Solo el creador o un administrador pueden eliminarlo."
         )
-    
-    print("✅ Usuario autorizado para eliminar")
+    else:
+        print("✅ Usuario autorizado para eliminar (es el creador)")
     
     deleted = crud_event.delete_event(db, event_id)
     if not deleted:

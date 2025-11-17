@@ -13,8 +13,8 @@ class EventBase(BaseModel):
     status: Optional[str] = "active"
 
 class EventCreate(EventBase):
-    organizer_id: int
-    creator_user_id: Optional[UUID] = None  # NUEVO: ID del usuario creador (UUID)
+    organizer_id: Optional[int] = None  # CAMBIO: Ahora es opcional
+    creator_user_id: Optional[UUID] = None
 
 class EventUpdate(BaseModel):
     title: Optional[str] = None
@@ -27,8 +27,12 @@ class EventUpdate(BaseModel):
 
 class EventOut(EventBase):
     id_event: int       
-    organizer_id: int
-    creator_user_id: Optional[UUID] = None  # NUEVO: ID del usuario creador (UUID)
+    organizer_id: Optional[int] = None  # CAMBIO: Ahora es opcional
+    creator_user_id: Optional[UUID] = None
     created_at: datetime
+    # Estadísticas calculadas
+    tickets_sold: Optional[int] = 0
+    available_tickets: Optional[int] = None
+    revenue: Optional[float] = 0.0
 
     model_config = ConfigDict(from_attributes=True)
