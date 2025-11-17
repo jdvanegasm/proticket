@@ -12,6 +12,10 @@ export interface EventAPI {
   creator_user_id?: string;
   status: string;
   created_at?: string;
+  // NUEVOS CAMPOS
+  tickets_sold?: number;
+  available_tickets?: number;
+  revenue?: number;
 }
 
 export interface EventUI {
@@ -30,36 +34,47 @@ export interface EventUI {
   organizerId?: string;
   creatorUserId?: string;
   status?: string;
-  start_datetime?: string; // Para poder parsear fecha/hora correctamente
+  start_datetime?: string;
+  // NUEVOS CAMPOS
+  ticketsSold?: number;
+  revenue?: number;
 }
 
 // Convertir de formato API a formato UI
 function transformEventFromAPI(apiEvent: EventAPI): EventUI {
   const datetime = new Date(apiEvent.start_datetime);
-  
+
+  // Usar los valores calculados del backend
+  const ticketsSold = apiEvent.tickets_sold || 0;
+  const availableTickets = apiEvent.available_tickets !== undefined
+    ? apiEvent.available_tickets
+    : apiEvent.capacity || 0;
+
   return {
     id: apiEvent.id_event.toString(),
     title: apiEvent.title,
     description: apiEvent.description,
     location: apiEvent.location,
-    date: datetime.toLocaleDateString('es-ES', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+    date: datetime.toLocaleDateString('es-ES', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
     }),
-    time: datetime.toLocaleTimeString('es-ES', { 
-      hour: '2-digit', 
-      minute: '2-digit' 
+    time: datetime.toLocaleTimeString('es-ES', {
+      hour: '2-digit',
+      minute: '2-digit'
     }),
     price: apiEvent.price,
     category: "Música",
     image: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800",
-    availableTickets: apiEvent.capacity || 0,
+    availableTickets: availableTickets,  // Usar el valor calculado del backend
     totalTickets: apiEvent.capacity || 0,
     organizerName: "Organizador",
     creatorUserId: apiEvent.creator_user_id,
     status: apiEvent.status,
-    start_datetime: apiEvent.start_datetime, // Mantener el datetime original para edición
+    start_datetime: apiEvent.start_datetime,
+    ticketsSold: ticketsSold,  // NUEVO
+    revenue: apiEvent.revenue || 0,  // NUEVO
   };
 }
 
@@ -85,9 +100,11 @@ export const eventsService = {
       start_datetime: `${eventData.date}T${eventData.time}:00`,
       price: parseFloat(eventData.price),
       capacity: parseInt(eventData.totalTickets),
-      organizer_id: 1,
+      // NO ENVIAR organizer_id, solo creator_user_id (se obtiene del token en el backend)
       status: "active",
     };
+
+    console.log("📤 Sending event data to backend:", apiData);
 
     const event = await apiRequest<EventAPI>('/events/', {
       method: 'POST',
@@ -96,6 +113,7 @@ export const eventsService = {
       },
       body: JSON.stringify(apiData),
     });
+
     return transformEventFromAPI(event);
   },
 
@@ -108,7 +126,7 @@ export const eventsService = {
       start_datetime: `${eventData.date}T${eventData.time}:00`,
       price: parseFloat(eventData.price),
       capacity: parseInt(eventData.totalTickets),
-      organizer_id: 1,
+      // NO ENVIAR organizer_id
       status: eventData.status || "active",
     };
 
@@ -119,6 +137,7 @@ export const eventsService = {
       },
       body: JSON.stringify(apiData),
     });
+
     return transformEventFromAPI(event);
   },
 

@@ -45,9 +45,23 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
-    if (user?.role === "organizer" && accessToken) {
+    if ((user?.role === "organizer" || user?.role === "admin") && accessToken) {
+      console.log("📊 Usuario organizador/admin detectado, cargando eventos...");
       fetchMyEvents();
     }
+  }, [user, accessToken, currentView]);
+
+  // Escuchar evento de refresco del dashboard
+  useEffect(() => {
+    const handleRefresh = () => {
+      console.log("🔄 Refresco manual solicitado");
+      if (user?.role === "organizer" && accessToken) {
+        fetchMyEvents();
+      }
+    };
+
+    window.addEventListener('refreshDashboard', handleRefresh);
+    return () => window.removeEventListener('refreshDashboard', handleRefresh);
   }, [user, accessToken]);
 
   async function fetchEvents() {
@@ -70,72 +84,57 @@ function AppContent() {
 
   async function fetchMyEvents() {
     if (!accessToken || !user) {
-      console.log("⚠️ fetchMyEvents: No accessToken o user", { hasToken: !!accessToken, hasUser: !!user });
+      console.log("⚠️ fetchMyEvents: No accessToken o user");
       return;
     }
 
     try {
-      console.log("📊 Fetching my events for user:", user.id);
-      
-      // Obtener eventos del organizador actual
-      const myEventsData = await eventsService.getByCreator(user.id, accessToken);
-      console.log("✅ Eventos obtenidos:", myEventsData.length, myEventsData);
-      
-      // Obtener órdenes de los eventos del organizador
-      let orders = [];
-      try {
-        orders = await ordersService.getByOrganizer(user.id, accessToken);
-        console.log("✅ Órdenes obtenidas:", orders.length);
-      } catch (orderError) {
-        console.warn("⚠️ Error obteniendo órdenes (continuando sin órdenes):", orderError);
-        // Continuar sin órdenes si hay error
-      }
-      
-      // Crear un mapa de event_id -> órdenes para calcular estadísticas
-      const ordersByEvent = new Map<number, typeof orders>();
-      orders.forEach(order => {
-        if (!ordersByEvent.has(order.event_id)) {
-          ordersByEvent.set(order.event_id, []);
-        }
-        ordersByEvent.get(order.event_id)!.push(order);
-      });
+      console.log("📊 Fetching my events for user:", user.id, "role:", user.role);
 
-      // Transformar a formato del dashboard con estadísticas reales
+      let myEventsData;
+
+      // Si es ADMIN, obtener TODOS los eventos
+      if (user.role === "admin") {
+        console.log("👑 Usuario ADMIN - Obteniendo TODOS los eventos");
+        myEventsData = await eventsService.getAll();
+      } else {
+        // Si es organizer, solo sus eventos
+        console.log("📊 Usuario Organizer - Obteniendo solo sus eventos");
+        myEventsData = await eventsService.getByCreator(user.id, accessToken);
+      }
+
+      console.log("✅ Eventos obtenidos con estadísticas del backend:", myEventsData);
+
+      // Transformar a formato del dashboard
       const dashboardEvents = myEventsData.map(event => {
-        const eventOrders = ordersByEvent.get(parseInt(event.id)) || [];
-        const ticketsSold = eventOrders.reduce((sum, order) => sum + order.quantity, 0);
-        const revenue = eventOrders
-          .filter(order => order.status === "paid" || order.status === "confirmed")
-          .reduce((sum, order) => sum + parseFloat(order.total_price.toString()), 0);
-        
-        // Calcular tasa de conversión (tickets vendidos / capacidad total)
-        const conversionRate = event.totalTickets > 0 
-          ? (ticketsSold / event.totalTickets) * 100 
+        const ticketsSold = event.ticketsSold || 0;
+        const revenue = event.revenue || 0;
+
+        const conversionRate = event.totalTickets > 0
+          ? (ticketsSold / event.totalTickets) * 100
           : 0;
+
+        console.log(`📊 Evento "${event.title}": vendidos=${ticketsSold}, ingresos=$${revenue}`);
 
         return {
           id: event.id,
           title: event.title,
           date: event.date,
           status: event.status || "active",
-          ticketsSold,
+          ticketsSold: ticketsSold,
           totalTickets: event.totalTickets,
-          revenue,
-          conversionRate: Math.round(conversionRate * 10) / 10, // Redondear a 1 decimal
+          revenue: revenue,
+          conversionRate: Math.round(conversionRate * 10) / 10,
         };
       });
 
       console.log("📊 Dashboard events preparados:", dashboardEvents);
+      console.log("💰 Ingresos totales:", dashboardEvents.reduce((sum, e) => sum + e.revenue, 0));
+
       setMyEvents(dashboardEvents);
     } catch (error: any) {
       console.error("❌ Error fetching my events:", error);
-      console.error("❌ Error details:", {
-        message: error.message,
-        stack: error.stack,
-        response: error.response
-      });
       toast.error(`Error al cargar tus eventos: ${error.message || "Error desconocido"}`);
-      // Establecer array vacío en caso de error para evitar mostrar datos antiguos
       setMyEvents([]);
     }
   }
@@ -167,19 +166,20 @@ function AppContent() {
     }
 
     try {
-      console.log("Creating order with buyer_id:", user.id);
+      console.log("💳 Creating order with buyer_id:", user.id);
 
-      // Crear la orden con el buyer_id del usuario autenticado
+      // Crear la orden con el buyer_id Y buyer_name del usuario autenticado
       const order = await ordersService.create(
         {
           event_id: parseInt(selectedEvent.id),
           quantity: data.quantity,
-          buyer_id: user.id, // AGREGADO - enviar el ID del usuario
+          buyer_id: user.id,
+          buyer_name: user.name,  // AGREGAR EL NOMBRE
         },
         accessToken
       );
 
-      console.log("Order created:", order);
+      console.log("✅ Order created:", order);
 
       // Crear tickets para la orden
       const tickets = [];
@@ -194,7 +194,7 @@ function AppContent() {
         tickets.push(ticket);
       }
 
-      console.log("Tickets created:", tickets);
+      console.log("✅ Tickets created:", tickets);
 
       // Generar código de confirmación
       const confirmationCode = tickets[0]?.ticket_code || `PT-${order.id_order}`;
@@ -211,10 +211,22 @@ function AppContent() {
       setCurrentView("confirmation");
       toast.success(t("message.purchaseSuccess"));
 
-      // Refrescar eventos
+      // IMPORTANTE: Esperar un momento y refrescar eventos para actualizar estadísticas
+      console.log("🔄 Esperando para refrescar eventos...");
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Esperar 1 segundo
+
+      console.log("🔄 Refrescando eventos después de compra...");
       await fetchEvents();
+
+      // Si hay un organizador con eventos cargados, refrescarlos también
+      if (myEvents.length > 0) {
+        console.log("🔄 Refrescando eventos del dashboard...");
+        await fetchMyEvents();
+      }
+
+      console.log("✅ Eventos refrescados con nuevas estadísticas");
     } catch (error: any) {
-      console.error("Purchase error:", error);
+      console.error("❌ Purchase error:", error);
       toast.error(error.message || "Error al procesar la compra");
     }
   };
@@ -225,8 +237,9 @@ function AppContent() {
       return;
     }
 
-    if (user.role !== "organizer") {
-      toast.error(t("message.organizersOnly"));
+    // Permitir crear eventos a organizers y admins
+    if (user.role !== "organizer" && user.role !== "admin") {
+      toast.error("Solo los organizadores y administradores pueden crear eventos");
       return;
     }
 
@@ -238,12 +251,11 @@ function AppContent() {
       console.log("✅ Event created:", newEvent);
       console.log("🔄 Refrescando eventos del dashboard...");
 
-      // Esperar un momento para que el backend procese
       await new Promise(resolve => setTimeout(resolve, 500));
-      
+
       await fetchEvents();
       await fetchMyEvents();
-      
+
       console.log("✅ Eventos refrescados");
       setCurrentView("dashboard");
       setEditingEventId(null);
@@ -252,7 +264,6 @@ function AppContent() {
       console.error("Create event error:", error);
       const errorMessage = error.message || "Error al crear evento";
 
-      // Extraer mensaje del servidor si existe
       if (errorMessage.includes("403")) {
         toast.error("No tienes permiso para crear eventos");
       } else if (errorMessage.includes("401")) {
@@ -269,8 +280,9 @@ function AppContent() {
       return;
     }
 
-    if (user.role !== "organizer") {
-      toast.error(t("message.organizersOnly"));
+    // Permitir editar a organizers y admins
+    if (user.role !== "organizer" && user.role !== "admin") {
+      toast.error("Solo los organizadores y administradores pueden editar eventos");
       return;
     }
 
@@ -289,9 +301,8 @@ function AppContent() {
       console.error("Update event error:", error);
       const errorMessage = error.message || "Error al actualizar evento";
 
-      // Extraer mensaje del servidor si existe
       if (errorMessage.includes("403") || errorMessage.includes("permiso")) {
-        toast.error("No tienes permiso para editar este evento. Solo el creador puede modificarlo.");
+        toast.error("No tienes permiso para editar este evento");
       } else if (errorMessage.includes("401")) {
         toast.error("Debes iniciar sesión para editar eventos");
       } else if (errorMessage.includes("404")) {
@@ -308,8 +319,9 @@ function AppContent() {
       return;
     }
 
-    if (user.role !== "organizer") {
-      toast.error(t("message.organizersOnly"));
+    // Permitir eliminar a organizers y admins
+    if (user.role !== "organizer" && user.role !== "admin") {
+      toast.error("Solo los organizadores y administradores pueden eliminar eventos");
       return;
     }
 
@@ -325,9 +337,8 @@ function AppContent() {
       console.error("Delete event error:", error);
       const errorMessage = error.message || "Error al eliminar evento";
 
-      // Extraer mensaje del servidor si existe
       if (errorMessage.includes("403") || errorMessage.includes("permiso")) {
-        toast.error("No tienes permiso para eliminar este evento. Solo el creador puede eliminarlo.");
+        toast.error("No tienes permiso para eliminar este evento");
       } else if (errorMessage.includes("401")) {
         toast.error("Debes iniciar sesión para eliminar eventos");
       } else if (errorMessage.includes("404")) {
@@ -357,7 +368,7 @@ function AppContent() {
   };
 
   const handleNavigate = (view: string) => {
-    if (view === "dashboard" && (!user || user.role !== "organizer")) {
+    if (view === "dashboard" && (!user || (user.role !== "organizer" && user.role !== "admin"))) {
       toast.error(t("message.organizersOnly"));
       return;
     }
