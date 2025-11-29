@@ -2,7 +2,7 @@ name: ProTicket CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ feature/dockerization ]
   pull_request:
 
 jobs:
