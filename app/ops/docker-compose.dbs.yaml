@@ -85,4 +85,5 @@ volumes:
 # =============================================
 networks:
   proticket_net:
+    name: proticket_net
     driver: bridge
