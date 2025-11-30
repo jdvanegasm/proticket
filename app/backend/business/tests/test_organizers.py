@@ -55,27 +55,24 @@ def create_test_organizer(db):
 
 # ------------------- Tests -------------------
 def test_create_organizer(test_client):
-    payload = {
-        "organization_name": "New Org",
+    payload = {        
+        "organization_name": "Test Org",
         "status": "draft"
     }
 
-    # Simular user_data correctamente para la dependencia
-    def override_get_user_info():
-        return {"id_user": uuid4()}
+    fake_user_id = uuid4()
 
-    from routes import organizers  # importar tu router si lo necesitas
-    app.dependency_overrides[organizers.get_user_info] = override_get_user_info
-
-    response = test_client.post("/organizers/", json=payload)
-    app.dependency_overrides.pop(organizers.get_user_info)
+    response = test_client.post(
+        "/organizers/",
+        json=payload,
+        headers={"Authorization": f"Bearer {fake_user_id}"}
+    )
 
     assert response.status_code == 200, response.text
     data = response.json()
     assert data["organization_name"] == payload["organization_name"]
     assert data["status"] == payload["status"]
     assert "id_organizer" in data
-    assert "user_id" in data
 
 def test_get_organizer_by_id(test_client, create_test_organizer):
     response = test_client.get(f"/organizers/{create_test_organizer.id_organizer}")

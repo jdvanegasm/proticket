@@ -5,7 +5,7 @@ import jwt
 from uuid import UUID as UUIDType, UUID
 from core.database import get_db
 from schemas.event import EventCreate, EventOut, EventUpdate
-from crud import crud_event
+from crud import crud_event, crud_organizers
 
 router = APIRouter(prefix="/events", tags=["Events"])
 
@@ -97,6 +97,12 @@ def create_event(
     
     # Extraer user_id y role del token
     user_id = get_user_id_from_token(authorization)
+    organizer = crud_organizers.get_organizer_by_user_id(db, user_id)
+    if not organizer:
+        print(f"Usuario {user_id} no es un organizador")
+        raise HTTPException(status_code=400, detail="El usuario no es un organizador")
+        
+    event.organizer_id = organizer.id_organizer
     
     if not user_id:
         print("❌ No se pudo extraer user_id del token")

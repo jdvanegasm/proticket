@@ -24,7 +24,7 @@ def create_order(db: Session, order_data: OrderCreate, buyer_id: UUID):
             event_id=order_data.event_id,
             quantity=order_data.quantity,
             total_price=total_price,
-            status="confirmed",  # CAMBIO: De "pending" a "confirmed"
+            status="pending",  # CAMBIO: De "pending" a "confirmed"
         )
         db.add(new_order)
         db.commit()

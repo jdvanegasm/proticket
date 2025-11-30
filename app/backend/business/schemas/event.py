@@ -14,7 +14,7 @@ class EventBase(BaseModel):
 
 class EventCreate(EventBase):
     organizer_id: Optional[int] = None  # CAMBIO: Ahora es opcional
-    creator_user_id: Optional[UUID] = None
+    # creator_user_id: Optional[UUID] = None
 
 class EventUpdate(BaseModel):
     title: Optional[str] = None

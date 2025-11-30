@@ -1,8 +1,7 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 from core.database import get_db
 from schemas.organizer import OrganizerCreate, OrganizerUpdate, OrganizerOut
-from services.auth_service import get_user_info
 from crud import crud_organizers
 
 router = APIRouter(prefix="/organizers", tags=["Organizers"])
@@ -11,9 +10,25 @@ router = APIRouter(prefix="/organizers", tags=["Organizers"])
 def create_organizer(
     organizer: OrganizerCreate,
     db: Session = Depends(get_db),
-    user_data: dict = Depends(get_user_info)
+    authorization: str = Header(...),
 ):
-    return crud_organizers.create_organizer(db, organizer, user_data["id_user"])
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    
+    user_id_str = authorization.replace("Bearer ", "").strip()
+    from uuid import UUID
+    try:
+        user_id = UUID(user_id_str)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid UUID in Authorization header")
+
+
+    print(f"Creating organizer for user_id: {user_id}")
+    print(f"Organizer data: {organizer}")
+
+    print(f"Creating organizer for user_id: {user_id}")
+    print(f"Organizer data: {organizer}")
+    return crud_organizers.create_organizer(db, organizer, user_id)
 
 @router.get("/{organizer_id}", response_model=OrganizerOut)
 def get_organizer(organizer_id: int, db: Session = Depends(get_db)):

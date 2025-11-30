@@ -34,6 +34,13 @@ def get_organizer_by_id(db: Session, organizer_id: int):
         )
     return organizer
 
+def get_organizer_by_user_id(db: Session, user_id: str):
+    try:
+        user_id = UUID(user_id)  # convierte string a UUID
+    except ValueError:
+        return None
+    return db.query(Organizer).filter(Organizer.user_id == user_id).first()
+
 
 def get_all_organizers(db: Session, skip: int = 0, limit: int = 100):
     return db.query(Organizer).offset(skip).limit(limit).all()
